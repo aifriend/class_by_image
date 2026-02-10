@@ -1,29 +1,47 @@
-## ENVIRONMENT SETUP
-    pip install --upgrade pip
+# Class by Image
 
-## PYTORCH INSTALLATION FOR CUDA 11
+Computer vision toolkit for image classification, object detection, GAN-based generation, and data augmentation.
 
-### Windows
-    pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+## Overview
 
-### Linux
-    pip install torch==1.9.0+cu111 torchvision==0.10.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+A collection of deep learning models and utilities for image-based machine learning tasks, built with PyTorch and TensorFlow.
 
-## GPU
+## Modules
 
-### Windows
-    Version             Python version	Compiler	Build tools     cuDNN       CUDA
-    tensorflow-2.4.0    3.6-3.8	        GCC 7.3.1	Bazel 3.1.0     8.0         11.0
+| Module | Description |
+|--------|-------------|
+| `classification/` | Image classification models |
+| `object_detection/` | Object detection pipelines |
+| `gan/` | Generative Adversarial Networks (DCGAN) |
+| `augmentation/` | Data augmentation utilities |
+| `common/` | Shared utilities |
 
-## SUPPORT INSTALLATION
-    pip install tf-nightly
+## Tech Stack
 
-## GAN TUTORIAL
-- https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
+- **Language:** Python 3.6–3.8
+- **Frameworks:** PyTorch 1.9+, TensorFlow 2.4+
+- **GPU:** CUDA 11.0/11.1, cuDNN 8.0
 
-## TRANSFORMER INSTALL FROM SOURCE
+## Requirements
 
-### v1.4.4
-    git clone https://github.com/huggingface/transformers.git
-    cd transformers
-    pip install -e .
+- Python 3.6+
+- CUDA 11.x compatible GPU (recommended)
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+For GPU support (PyTorch + CUDA 11.1):
+```bash
+pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+```
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+## Author
+
+**Jose** — [@aifriend](https://github.com/aifriend)
