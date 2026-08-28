@@ -38,21 +38,26 @@ class Generator(nn.Module):
             nn.ReLU()
         )
         self.t7 = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=4000, out_channels=512, kernel_size=(4, 4), stride=1, padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU()
+        )
+        self.t8 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=(4, 4), stride=2, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU()
         )
-        self.t8 = nn.Sequential(
+        self.t9 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=(4, 4), stride=2, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU()
         )
-        self.t9 = nn.Sequential(
+        self.t10 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=(4, 4), stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU()
         )
-        self.t10 = nn.Sequential(
+        self.t11 = nn.Sequential(
             nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(4, 4), stride=2, padding=1),
             nn.Tanh()
         )
@@ -68,4 +73,5 @@ class Generator(nn.Module):
         x = self.t8(x)
         x = self.t9(x)
         x = self.t10(x)
+        x = self.t11(x)
         return x  # output of generator

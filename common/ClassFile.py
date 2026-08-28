@@ -116,21 +116,6 @@ class ClassFile:
         return file_filter
 
     @staticmethod
-    def filter_by_language(source: list):
-        file_filter = list()
-        spell_checker_service = SpanishSpellChecker()
-        for n, file in enumerate(source):
-            print(f".{n}", end='')
-            content = ClassFile.get_text(file)
-            content = ClassFile.simplify(content)
-            is_readable, ratio = spell_checker_service.is_spanish(content)
-            if os.path.isfile(file) and is_readable:
-                file_filter.append(file)
-        print()
-
-        return file_filter
-
-    @staticmethod
     def filter_by_ext(source, ext):
         """
         filter all files with ext
@@ -206,7 +191,7 @@ class ClassFile:
         get the path and name of the file without the extension
         """
         if '.' in file_name:
-            separator_index = file_name.index('.')
+            separator_index = file_name.rindex('.')
             base_name = file_name[:separator_index]
             return base_name
         else:
@@ -234,7 +219,7 @@ class ClassFile:
         save a list to a file using pickle dump
         """
         with open(file_, 'wb') as fp:
-            pickle.dump(sorted(list(set_)), fp)
+            pickle.dump(sorted(set(set_)), fp)
 
     @staticmethod
     def dump(doc, path):
@@ -284,7 +269,7 @@ class ClassFile:
         """
         load numpy image from csv file
         """
-        np.loadtxt(csv_file)
+        return np.loadtxt(csv_file)
 
     @staticmethod
     def get_text(filename, encoding="ISO-8859-1"):
@@ -307,7 +292,8 @@ class ClassFile:
         """
         save scikit-learn model
         """
-        pickle.dump(model, open(filename, 'wb'))
+        with open(filename, 'wb') as fp:
+            pickle.dump(model, fp)
 
     @staticmethod
     def load_model(filename):

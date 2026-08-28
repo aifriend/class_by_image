@@ -1,13 +1,13 @@
 import argparse
 import os
 
+import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
-from torch.autograd import Variable
 
 from gan.paint.Discriminator import Discriminator
 from gan.paint.Generator import Generator
@@ -18,28 +18,6 @@ Batch_Size = 64
 lr = 0.0002
 beta1 = 0.5
 over = 4
-parser = argparse.ArgumentParser()
-parser.add_argument('--dataroot', default='dataset/train', help='path to dataset')
-opt = parser.parse_args()
-try:
-    os.makedirs("result/train/cropped")
-    os.makedirs("result/train/real")
-    os.makedirs("result/train/recon")
-    os.makedirs("model")
-except OSError:
-    pass
-
-transform = transforms.Compose([transforms.Scale(128),
-                                transforms.CenterCrop(128),
-                                transforms.ToTensor(),
-                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-dataset = dset.ImageFolder(root=opt.dataroot, transform=transform)
-assert dataset
-dataloader = torch.utils.data.DataLoader(dataset, batch_size=Batch_Size,
-                                         shuffle=True, num_workers=2)
-
-ngpu = int(opt.ngpu)
-
 wtl2 = 0.999
 
 
@@ -53,51 +31,60 @@ def weights_init(m):
         m.bias.data.fill_(0)
 
 
-resume_epoch = 0
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataroot', default='dataset/train', help='path to dataset')
+    parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use (0 for CPU)')
+    opt = parser.parse_args()
 
-netG = Generator()
-netG.apply(weights_init)
+    os.makedirs("result/train/cropped", exist_ok=True)
+    os.makedirs("result/train/real", exist_ok=True)
+    os.makedirs("result/train/recon", exist_ok=True)
+    os.makedirs("model", exist_ok=True)
 
-netD = Discriminator()
-netD.apply(weights_init)
+    transform = transforms.Compose([transforms.Resize(128),
+                                    transforms.CenterCrop(128),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    dataset = dset.ImageFolder(root=opt.dataroot, transform=transform)
+    assert dataset
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=Batch_Size,
+                                             shuffle=True, num_workers=2)
 
-criterion = nn.BCELoss()
-criterionMSE = nn.MSELoss()
+    ngpu = opt.ngpu
+    device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
-input_real = torch.FloatTensor(Batch_Size, 3, 128, 128)
-input_cropped = torch.FloatTensor(Batch_Size, 3, 128, 128)
-label = torch.FloatTensor(Batch_Size)
-real_label = 1
-fake_label = 0
+    resume_epoch = 0
 
-real_center = torch.FloatTensor(Batch_Size, 3, 64, 64)
+    netG = Generator()
+    netG.apply(weights_init)
 
-netD.cuda()
-netG.cuda()
-criterion.cuda()
-criterionMSE.cuda()
-input_real, input_cropped, label = input_real.cuda(), input_cropped.cuda(), label.cuda()
-real_center = real_center.cuda()
+    netD = Discriminator()
+    netD.apply(weights_init)
 
-input_real = Variable(input_real)
-input_cropped = Variable(input_cropped)
-label = Variable(label)
+    criterion = nn.BCELoss()
+    criterionMSE = nn.MSELoss()
 
-real_center = Variable(real_center)
+    netD.to(device)
+    netG.to(device)
+    criterion.to(device)
+    criterionMSE.to(device)
 
-optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
-optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+    real_label = 1
+    fake_label = 0
 
-for epoch in range(resume_epoch, epochs):
-    for i, data in enumerate(dataloader, 0):
-        real_cpu, _ = data
-        real_center_cpu = real_cpu[:, :, int(128 / 4):int(128 / 4) + int(128 / 2),
-                          int(128 / 4):int(128 / 4) + int(128 / 2)]
-        batch_size = real_cpu.size(0)
-        with torch.no_grad():
-            input_real.resize_(real_cpu.size()).copy_(real_cpu)
-            input_cropped.resize_(real_cpu.size()).copy_(real_cpu)
-            real_center.resize_(real_center_cpu.size()).copy_(real_center_cpu)
+    optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+
+    for epoch in range(resume_epoch, epochs):
+        for i, data in enumerate(dataloader, 0):
+            real_cpu, _ = data
+            real_cpu = real_cpu.to(device)
+            real_center_cpu = real_cpu[:, :, int(128 / 4):int(128 / 4) + int(128 / 2),
+                              int(128 / 4):int(128 / 4) + int(128 / 2)]
+            batch_size = real_cpu.size(0)
+            input_cropped = real_cpu.clone()
+            real_center = real_center_cpu.clone()
             input_cropped[:, 0, int(128 / 4 + over):int(128 / 4 + 128 / 2 - over),
             int(128 / 4 + over):int(128 / 4 + 128 / 2 - over)] = 2 * 117.0 / 255.0 - 1.0
             input_cropped[:, 1, int(128 / 4 + over):int(128 / 4 + 128 / 2 - over),
@@ -105,57 +92,60 @@ for epoch in range(resume_epoch, epochs):
             input_cropped[:, 2, int(128 / 4 + over):int(128 / 4 + 128 / 2 - over),
             int(128 / 4 + over):int(128 / 4 + 128 / 2 - over)] = 2 * 123.0 / 255.0 - 1.0
 
-        # start the discriminator by training with real data---
-        netD.zero_grad()
-        with torch.no_grad():
-            label.resize_(batch_size).fill_(real_label)
+            # start the discriminator by training with real data---
+            netD.zero_grad()
+            label = torch.full((batch_size,), real_label, dtype=torch.float, device=device)
 
-        output = netD(real_center)
-        errD_real = criterion(output, label)
-        errD_real.backward()
-        D_x = output.data.mean()
+            output = netD(real_center).view(-1)
+            errD_real = criterion(output, label)
+            errD_real.backward()
+            D_x = output.mean().item()
 
-        # train the discriminator with fake data---
-        fake = netG(input_cropped)
-        label.data.fill_(fake_label)
-        output = netD(fake.detach())
-        errD_fake = criterion(output, label)
-        errD_fake.backward()
-        D_G_z1 = output.data.mean()
-        errD = errD_real + errD_fake
-        optimizerD.step()
+            # train the discriminator with fake data---
+            fake = netG(input_cropped)
+            label.fill_(fake_label)
+            output = netD(fake.detach()).view(-1)
+            errD_fake = criterion(output, label)
+            errD_fake.backward()
+            D_G_z1 = output.mean().item()
+            errD = errD_real + errD_fake
+            optimizerD.step()
 
-        # train the generator now---
-        netG.zero_grad()
-        label.data.fill_(real_label)  # fake labels are real for generator cost
-        output = netD(fake)
-        errG_D = criterion(output, label)
+            # train the generator now---
+            netG.zero_grad()
+            label.fill_(real_label)  # fake labels are real for generator cost
+            output = netD(fake).view(-1)
+            errG_D = criterion(output, label)
 
-        wtl2Matrix = real_center.clone()
-        wtl2Matrix.data.fill_(wtl2 * 10)
-        wtl2Matrix.data[:, :, int(over):int(128 / 2 - over), int(over):int(128 / 2 - over)] = wtl2
+            wtl2Matrix = real_center.clone()
+            wtl2Matrix.fill_(wtl2 * 10)
+            wtl2Matrix[:, :, int(over):int(128 / 2 - over), int(over):int(128 / 2 - over)] = wtl2
 
-        errG_l2 = (fake - real_center).pow(2)
-        errG_l2 = errG_l2 * wtl2Matrix
-        errG_l2 = errG_l2.mean()
+            errG_l2 = (fake - real_center).pow(2)
+            errG_l2 = errG_l2 * wtl2Matrix
+            errG_l2 = errG_l2.mean()
 
-        errG = (1 - wtl2) * errG_D + wtl2 * errG_l2
+            errG = (1 - wtl2) * errG_D + wtl2 * errG_l2
 
-        errG.backward()
+            errG.backward()
 
-        D_G_z2 = output.data.mean()
-        optimizerG.step()
+            D_G_z2 = output.mean().item()
+            optimizerG.step()
 
-        print('[%d / %d][%d / %d] Loss_D: %.4f Loss_G: %.4f / %.4f l_D(x): %.4f l_D(G(z)): %.4f'
-              % (epoch, epochs, i, len(dataloader),
-                 errD.data, errG_D.data, errG_l2.data, D_x, D_G_z1,))
+            print('[%d / %d][%d / %d] Loss_D: %.4f Loss_G: %.4f / %.4f l_D(x): %.4f l_D(G(z)): %.4f'
+                  % (epoch, epochs, i, len(dataloader),
+                     errD.item(), errG_D.item(), errG_l2.item(), D_x, D_G_z1,))
 
-        if i % 100 == 0:
-            vutils.save_image(real_cpu,
-                              'result/train/real/real_samples_epoch_%03d.png' % (epoch))
-            vutils.save_image(input_cropped.data,
-                              'result/train/cropped/cropped_samples_epoch_%03d.png' % (epoch))
-            recon_image = input_cropped.clone()
-            recon_image.data[:, :, int(128 / 4):int(128 / 4 + 128 / 2), int(128 / 4):int(128 / 4 + 128 / 2)] = fake.data
-            vutils.save_image(recon_image.data,
-                              'result/train/recon/recon_center_samples_epoch_%03d.png' % (epoch))
+            if i % 100 == 0:
+                vutils.save_image(real_cpu,
+                                  'result/train/real/real_samples_epoch_%03d.png' % (epoch))
+                vutils.save_image(input_cropped,
+                                  'result/train/cropped/cropped_samples_epoch_%03d.png' % (epoch))
+                recon_image = input_cropped.clone()
+                recon_image[:, :, int(128 / 4):int(128 / 4 + 128 / 2), int(128 / 4):int(128 / 4 + 128 / 2)] = fake
+                vutils.save_image(recon_image,
+                                  'result/train/recon/recon_center_samples_epoch_%03d.png' % (epoch))
+
+
+if __name__ == '__main__':
+    main()

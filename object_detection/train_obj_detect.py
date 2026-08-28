@@ -52,7 +52,7 @@ class GbcCnnService:
         }
 
         image_datasets = {x: datasets.ImageFolder(
-            os.path.join(image_service.DATA_DIR, x), data_transforms[x])
+            os.path.join(self.DATA_DIR, x), data_transforms[x])
             for x in ['train', 'val']}
 
         self.data_loader = {x: DataLoader(
@@ -179,16 +179,16 @@ class GbcCnnService:
             plt.close()
 
     def modeling(self):
-        self.model = models.vgg16(pretrained=True)
+        self.model = models.vgg16(weights="IMAGENET1K_V1")
 
         # fixed pre-trained cnn weights
         for param in self.model.parameters():
             param.requires_grad = False
 
         # add new classification layer
-        self.model.classifier[-1] = nn.Linear(in_features=4096, out_features=len(self.class_list))
+        self.model.classifier[-1] = nn.Linear(in_features=4096, out_features=len(self.class_name_list))
 
-        self.model = self.model.to(image_service.device)
+        self.model = self.model.to(self.device)
 
         self.criterion = nn.CrossEntropyLoss()
 

@@ -12,7 +12,11 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
-from IPython.display import HTML
+
+try:
+    from IPython.display import HTML
+except ImportError:
+    HTML = None
 
 plt.ion()  # interactive mode
 
@@ -315,22 +319,21 @@ class GbcGanService:
         time.sleep(5)
         plt.close()
 
-    @staticmethod
-    def show_generated_fake():
+    def show_generated_fake(self):
         fig = plt.figure(figsize=(8, 8))
         plt.axis("off")
         ims = [[plt.imshow(np.transpose(
-            i, (1, 2, 0)), animated=True)] for i in gan_service.img_list]
+            i, (1, 2, 0)), animated=True)] for i in self.img_list]
         ani = animation.ArtistAnimation(
             fig, ims, interval=1000, repeat_delay=1000, blit=True)
-        HTML(ani.to_jshtml())
+        if HTML is not None:
+            HTML(ani.to_jshtml())
         plt.pause(0.5)
         time.sleep(15)
 
-    @staticmethod
-    def show_comparison():
+    def show_comparison(self):
         # Grab a batch of real images from the data loader
-        real_batch = next(iter(gan_service.data_loader))
+        real_batch = next(iter(self.data_loader))
 
         # Plot the real images
         plt.figure(figsize=(15, 15))
@@ -339,14 +342,14 @@ class GbcGanService:
         plt.title("Real Images")
         plt.imshow(np.transpose(
             vutils.make_grid(
-                real_batch[0].to(gan_service.device)[:64],
+                real_batch[0].to(self.device)[:64],
                 padding=5, normalize=True).cpu(), (1, 2, 0)))
 
         # Plot the fake images from the last epoch
         plt.subplot(1, 2, 2)
         plt.axis("off")
         plt.title("Fake Images")
-        plt.imshow(np.transpose(gan_service.img_list[-1], (1, 2, 0)))
+        plt.imshow(np.transpose(self.img_list[-1], (1, 2, 0)))
         plt.show()
         plt.pause(0.5)
         time.sleep(15)

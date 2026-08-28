@@ -1,6 +1,6 @@
+import argparse
 import os.path
 import random
-from time import sleep
 
 from tqdm import tqdm
 
@@ -9,6 +9,8 @@ import cv2
 from matplotlib import pyplot as plt
 
 from common.ClassFile import ClassFile
+
+IMG_EXT = ["jpg", "png", "jpeg"]
 
 
 def visualize(_image):
@@ -21,7 +23,9 @@ def visualize(_image):
         raise IOError()
 
 
-def load(path, doc=None, ext_list=[]):
+def load(path, doc=None, ext_list=None):
+    if ext_list is None:
+        ext_list = IMG_EXT
     print(f"Loading data for augmentation from [{path}]", end="")
     _image_list = list()
     if doc is None:
@@ -43,13 +47,12 @@ def load(path, doc=None, ext_list=[]):
     else:
         _image = cv2.imread(os.path.join(path, doc))
         if _image is not None:
-            _image = cv2.cvtColor(_image, cv2.COLOR_BGR2GRAY)
+            _image = cv2.cvtColor(_image, cv2.COLOR_BGR2RGB)
             _image_list.append((doc, _image))
             print(".", end="")
         else:
             print("X", end="")
     print()
-    sleep(3)
 
     return _image_list
 
@@ -69,17 +72,21 @@ def transform(file, image, count):
     ])
     augmented_image = list()
     augmented_name = list()
-    for _ in range(1, count+1):
+    for _ in range(1, count + 1):
         augmented_name.append(file)
         augmented_image.append(_transform(image=image)['image'])
     return augmented_name, augmented_image
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Augment an image dataset")
+    parser.add_argument("image_path", help="path to the image folder to augment")
+    parser.add_argument("--aug-factor", type=int, default=10,
+                        help="number of augmented copies per image")
+    opt = parser.parse_args()
+
     random.seed(42)
-    AUG_FACTOR = 10
-    IMG_EXT = ["jpg", "png", "jpeg"]
-    image_list = load(f"{image_path}", ext_list=IMG_EXT)
+    image_list = load(opt.image_path, ext_list=IMG_EXT)
     print("Augmenting dataset...")
     loop = tqdm(image_list)
     for file, image in loop:
@@ -90,16 +97,17 @@ def main():
 
         # augmented image
         augmented_name_list, augmented_image_list = \
-            transform(file=file, image=image, count=AUG_FACTOR)
+            transform(file=file, image=image, count=opt.aug_factor)
         # visualize(augmented_image_list[0])
         for idx, (augmented_name, augmented_image) in \
                 enumerate(zip(augmented_name_list, augmented_image_list)):
             aug_f_path, aug_f_name = os.path.split(augmented_name)
             aug_f_name, aug_f_ext = os.path.splitext(aug_f_name)
             aug_f_name = f"{aug_f_name}_aug{idx}{aug_f_ext}"
-            cv2.imwrite(os.path.join(image_train, aug_f_name), augmented_image)
+            # images are RGB; convert back to BGR for cv2.imwrite
+            cv2.imwrite(os.path.join(image_train, aug_f_name),
+                        cv2.cvtColor(augmented_image, cv2.COLOR_RGB2BGR))
 
 
 if __name__ == '__main__':
-    image_path = rf"C:\Users\JoseAntonioFernandez\Desktop\IMAGE\classification\dataset\train\NEW"
     main()

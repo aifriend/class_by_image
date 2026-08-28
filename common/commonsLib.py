@@ -43,17 +43,17 @@ class loggerElk:
         }
         self.serviceName = str(owner__name__)
 
-        enableKibana = self.__get_boolean_os_var("ELK_ENABLED")
+        self.elkEnabled = self.__get_boolean_os_var("ELK_ENABLED")
         enableFile = self.__get_boolean_os_var("FILE_ENABLED")
 
         try:
             self.lib_lob_level = str(os.environ["LIBRARIES_LOG_LEVEL"])
-        except:
+        except KeyError:
             print('ERROR GETTING THE ENV_VAR LIBRARIES_LOG_LEVEL... \'ERROR\' BY DEFAULT')
             self.lib_lob_level = "ERROR"
         try:
             logLevel = os.environ["LOG_LEVEL"]
-        except:
+        except KeyError:
             print('ERROR GETTING THE ENV_VAR LOG_LEVEL... \'DEBUG\' BY DEFAULT')
             logLevel = "DEBUG"
 
@@ -85,9 +85,6 @@ class loggerElk:
             except Exception as e:
                 self.logger.warning("LOG_FILE env-var not provided or can't write the file::{}.".format(e))
                 print("WARNING!: LOG_FILE env-var not provided or can't write the file::{}.".format(e))
-
-        else:
-            self.elkEnabled = False
 
     def LogResult(self, message, ObjectData, extraAttrs=None):
         li = LogItem(message, 'Information', "result", ObjectData)

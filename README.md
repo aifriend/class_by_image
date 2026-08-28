@@ -4,38 +4,57 @@ Computer vision toolkit for image classification, object detection, GAN-based ge
 
 ## Overview
 
-A collection of deep learning models and utilities for image-based machine learning tasks, built with PyTorch and TensorFlow.
+A collection of deep learning models and utilities for image-based machine learning tasks, built with PyTorch.
 
 ## Modules
 
 | Module | Description |
 |--------|-------------|
-| `classification/` | Image classification models |
-| `object_detection/` | Object detection pipelines |
-| `gan/` | Generative Adversarial Networks (DCGAN) |
-| `augmentation/` | Data augmentation utilities |
+| `classification/` | Image classification training (VGG11 transfer learning) |
+| `object_detection/` | Object detection / recognition pipelines (VGG16) |
+| `gan/` | Generative Adversarial Networks (DCGAN + context-encoder inpainting) |
+| `augmentation/` | Data augmentation utilities (albumentations) |
 | `common/` | Shared utilities |
+| `tests/` | Unit tests (pytest) |
 
 ## Tech Stack
 
-- **Language:** Python 3.6–3.8
-- **Frameworks:** PyTorch 1.9+, TensorFlow 2.4+
-- **GPU:** CUDA 11.0/11.1, cuDNN 8.0
-
-## Requirements
-
-- Python 3.6+
-- CUDA 11.x compatible GPU (recommended)
+- **Language:** Python 3.9+
+- **Frameworks:** PyTorch 2.x, torchvision
+- **GPU:** CUDA optional — all scripts fall back to CPU
 
 ## Installation
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-For GPU support (PyTorch + CUDA 11.1):
+## Usage
+
 ```bash
-pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+# Augment a dataset (writes copies into an "aug" subfolder)
+python augmentation/aug_pipeline.py /path/to/images --aug-factor 10
+
+# Train the document classifier (expects an ImageFolder dataset)
+python classification/train_doc_class.py
+
+# Run a VGG16 prediction on a sample image
+python object_detection/predict_obj_detect.py
+
+# Train the DCGAN
+python gan/run_gan.py
+
+# Train the context-encoder inpainting GAN
+python gan/paint/run_inpaint.py --dataroot dataset/train --ngpu 0
+```
+
+## Tests
+
+```bash
+pip install pytest
+python -m pytest tests/
 ```
 
 ## License

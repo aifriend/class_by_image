@@ -1,10 +1,16 @@
+import argparse
 import glob
 import os
 import shutil
 
 
-if __name__ == '__main__':
-    path = r"D:\LAB\dni_x2"
+def main():
+    parser = argparse.ArgumentParser(
+        description="Move augmented leftovers (files matching '*_?<digit>.*') to an 'empty' folder")
+    parser.add_argument("path", help="folder to clean up")
+    opt = parser.parse_args()
+
+    path = opt.path
 
     # Check whether the specified path exists or not
     path_empty = os.path.join(path, "../empty")
@@ -21,3 +27,7 @@ if __name__ == '__main__':
                     dst=os.path.join(f_path, "../empty", f_name))
         total -= 1
         print(f"LEFT EMPTY: {total}")
+
+
+if __name__ == '__main__':
+    main()

@@ -5,8 +5,6 @@ import warnings
 from tqdm import tqdm
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
-os.environ['CUDA_LAUNCH_BLOCKING'] = "3"
-CUDA_LAUNCH_BLOCKING = 1
 warnings.filterwarnings("ignore")
 
 import torch
@@ -20,7 +18,7 @@ from common.ClassFile import ClassFile
 
 
 class GbcCnnService:
-    DEVICE_TYPE = 'cuda:0'
+    DEVICE_TYPE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     DATA_DIR = "./../classification/dataset"
     MODEL_PATH = './model'
     MODEL_LOAD_NAME = '_img_v2.model'
@@ -45,9 +43,10 @@ class GbcCnnService:
         self.device = torch.device(self.DEVICE_TYPE)
 
     def make_model(self):
+        ClassFile.create_dir(self.MODEL_PATH)
         if not ClassFile.has_file(self.MODEL_PATH, self.MODEL_LOAD_NAME):
             print(f"Loading base model from pre-trained 'VGG11'...")
-            self.model = models.vgg11_bn(pretrained=True)
+            self.model = models.vgg11_bn(weights="IMAGENET1K_V1")
 
             # fixed pre-trained cnn weights
             for param in self.model.parameters():
@@ -62,7 +61,8 @@ class GbcCnnService:
             print(f"Saving model from '{self.path_to_save_model}'...")
         else:
             print(f"Loading trained model from '{self.path_to_load_model}'...")
-            self.model = torch.load(self.path_to_load_model, map_location=self.device)
+            self.model = torch.load(self.path_to_load_model, map_location=self.device,
+                                    weights_only=False)
             self.model.eval()
             self.model.to(self.device)
 
@@ -73,8 +73,7 @@ class GbcCnnService:
         # Decay LR by a factor of 0.1 every 7 epochs
         self.scheduler = lr_scheduler.StepLR(self.optimizer, step_size=7, gamma=0.1)
 
-        current_device = torch.cuda.get_device_name(torch.cuda.current_device())
-        print(f"Current device {current_device} is {torch.cuda.is_available()}")
+        print(f"Current device: {self.device}")
 
     def load_data(self):
         """
@@ -131,9 +130,8 @@ class GbcCnnService:
         self.dataset_size_dict.update({x: len(val_dataset) for x in ['val']})
         print(f"Total of validation data: {self.dataset_size_dict['val']}")
         self.class_name_list = val_dataset.dataset.classes
-        # print(f"Classes: {self.class_name_list}")
 
-        # Get a batch of training data to show
+        # Get a batch of validation data to show
         self.inputs, self.class_list = next(iter(self.data_validation_loader['val']))
 
     def train_model(self, _num_epochs):
@@ -141,7 +139,8 @@ class GbcCnnService:
         since = time.time()
         best_acc = 0.0
 
-        for epoch in range(1, _num_epochs+1):
+        for epoch in range(1, _num_epochs + 1):
+            epoch_acc_dict = {}
             # Each epoch has a training and validation phase
             for phase in ['train', 'val']:
                 if phase == 'train':
@@ -189,23 +188,22 @@ class GbcCnnService:
                     self.scheduler.step()
 
                 epoch_loss = running_loss / self.dataset_size_dict[phase]
-                epoch_acc = running_corrects / self.dataset_size_dict[phase]
+                epoch_acc = running_corrects.double() / self.dataset_size_dict[phase]
+                epoch_acc_dict[phase] = float(epoch_acc)
 
-                if phase == "train":
-                    print('{} Loss: {:.4f} Acc: {:.4f}'
-                          .format(phase.upper(), epoch_loss, epoch_acc))
+                print('{} Loss: {:.4f} Acc: {:.4f}'
+                      .format(phase.upper(), epoch_loss, epoch_acc))
 
-                # deep copy the model
-                if phase == 'train' and epoch_acc > best_acc:
-                    best_acc = epoch_acc
-                    score = running_corrects / self.dataset_size_dict[phase]
-                    print(f"Best model so far: {score}")
+                # save the model when validation accuracy improves
+                if phase == 'val' and epoch_acc > best_acc:
+                    best_acc = float(epoch_acc)
+                    print(f"Best model so far: {best_acc:.4f}")
                     torch.save(self.model, self.path_to_save_model)
                     print(f"Saving trained model from '{self.path_to_save_model}'...")
 
-            score_train = running_corrects / self.dataset_size_dict["train"]
-            score_val = running_corrects / self.dataset_size_dict["val"]
-            if (score_train + score_val) // 2 >= 0.98:
+            score_train = epoch_acc_dict["train"]
+            score_val = epoch_acc_dict["val"]
+            if (score_train + score_val) / 2 >= 0.98:
                 print("Run ends with 98% accuracy")
                 break
 
