@@ -50,6 +50,16 @@ python gan/run_gan.py
 python gan/paint/run_inpaint.py --dataroot dataset/train --ngpu 0
 ```
 
+### Training the document classifier
+
+Run it from the repository root as a module, because the script imports `common.ClassFile` and a direct `python classification/train_doc_class.py` call cannot find the `common` package:
+
+```bash
+python -m classification.train_doc_class
+```
+
+The script reads an ImageFolder dataset (one subfolder per class) from `../classification/dataset`, resolved against the directory you run it from. It trains for 15 epochs with a batch size of 128 and holds out 20% of the images for validation. The best checkpoint is saved to `./model/_img_v3.model`.
+
 ## Tests
 
 ```bash
