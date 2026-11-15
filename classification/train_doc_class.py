@@ -21,17 +21,18 @@ class GbcCnnService:
     DEVICE_TYPE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     DATA_DIR = "./../classification/dataset"
     MODEL_PATH = './model'
-    MODEL_LOAD_NAME = '_img_v2.model'
-    MODEL_SAVE_NAME = '_img_v3.model'
+    MODEL_NAME = '_img_v3.model'
     NUM_EPOCHS = 15
     BATCH_SIZE = 128
     SPLIT = .2
 
-    def __init__(self):
+    def __init__(self, data_dir=None, model_path=None):
+        self.data_dir = data_dir or self.DATA_DIR
+        self.model_path = model_path or self.MODEL_PATH
         self.data_train_loader = None
         self.data_validation_loader = None
-        self.path_to_load_model = os.path.join(self.MODEL_PATH, self.MODEL_LOAD_NAME)
-        self.path_to_save_model = os.path.join(self.MODEL_PATH, rf"{self.MODEL_SAVE_NAME}.all")
+        # one checkpoint file (a state_dict) is both loaded and saved
+        self.path_to_model = os.path.join(self.model_path, self.MODEL_NAME)
         self.inputs = None
         self.class_list = list()
         self.class_name_list = list()
@@ -42,29 +43,34 @@ class GbcCnnService:
         self.criterion = None
         self.device = torch.device(self.DEVICE_TYPE)
 
-    def make_model(self):
-        ClassFile.create_dir(self.MODEL_PATH)
-        if not ClassFile.has_file(self.MODEL_PATH, self.MODEL_LOAD_NAME):
+    def build_model(self, pretrained=True):
+        """Create VGG11 with a new classification layer sized for the current classes."""
+        weights = "IMAGENET1K_V1" if pretrained else None
+        model = models.vgg11_bn(weights=weights)
+
+        # fixed pre-trained cnn weights
+        for param in model.parameters():
+            param.requires_grad = False
+
+        # add new classification layer
+        model.classifier[-1] = nn.Linear(
+            in_features=4096, out_features=len(self.class_name_list))
+        return model.to(self.device)
+
+    def make_model(self, pretrained=True):
+        ClassFile.create_dir(self.model_path)
+        if not os.path.isfile(self.path_to_model):
             print(f"Loading base model from pre-trained 'VGG11'...")
-            self.model = models.vgg11_bn(weights="IMAGENET1K_V1")
-
-            # fixed pre-trained cnn weights
-            for param in self.model.parameters():
-                param.requires_grad = False
-
-            # add new classification layer
-            self.model.classifier[-1] = nn.Linear(
-                in_features=4096, out_features=len(self.class_name_list))
-
-            self.model = self.model.to(self.device)
-            torch.save(self.model, self.path_to_save_model)
-            print(f"Saving model from '{self.path_to_save_model}'...")
+            self.model = self.build_model(pretrained=pretrained)
+            torch.save(self.model.state_dict(), self.path_to_model)
+            print(f"Saving model to '{self.path_to_model}'...")
         else:
-            print(f"Loading trained model from '{self.path_to_load_model}'...")
-            self.model = torch.load(self.path_to_load_model, map_location=self.device,
-                                    weights_only=False)
+            print(f"Loading trained model from '{self.path_to_model}'...")
+            self.model = self.build_model(pretrained=False)
+            state_dict = torch.load(self.path_to_model, map_location=self.device,
+                                    weights_only=True)
+            self.model.load_state_dict(state_dict)
             self.model.eval()
-            self.model.to(self.device)
 
         self.criterion = nn.CrossEntropyLoss()
 
@@ -79,7 +85,7 @@ class GbcCnnService:
         """
         read dataset
         """
-        print(f"\nPre-process data from '{GbcCnnService.DATA_DIR}'")
+        print(f"\nPre-process data from '{self.data_dir}'")
         data_transform = transforms.Compose([
                 transforms.Grayscale(3),
                 transforms.Resize(256),
@@ -89,7 +95,7 @@ class GbcCnnService:
             ])
 
         print(f"Loading data...")
-        image_datasets = datasets.ImageFolder(self.DATA_DIR, data_transform)
+        image_datasets = datasets.ImageFolder(self.data_dir, data_transform)
 
         dataset_size = len(image_datasets)
         split_size = int(dataset_size * self.SPLIT)
@@ -198,8 +204,8 @@ class GbcCnnService:
                 if phase == 'val' and epoch_acc > best_acc:
                     best_acc = float(epoch_acc)
                     print(f"Best model so far: {best_acc:.4f}")
-                    torch.save(self.model, self.path_to_save_model)
-                    print(f"Saving trained model from '{self.path_to_save_model}'...")
+                    torch.save(self.model.state_dict(), self.path_to_model)
+                    print(f"Saving trained model to '{self.path_to_model}'...")
 
             score_train = epoch_acc_dict["train"]
             score_val = epoch_acc_dict["val"]
