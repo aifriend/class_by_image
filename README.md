@@ -38,7 +38,7 @@ pip install -r requirements.txt
 python augmentation/aug_pipeline.py /path/to/images --aug-factor 10
 
 # Train the document classifier (expects an ImageFolder dataset)
-python classification/train_doc_class.py
+python -m classification.train_doc_class
 
 # Run a VGG16 prediction on a sample image
 python object_detection/predict_obj_detect.py
